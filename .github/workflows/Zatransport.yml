@@ -1,0 +1,108 @@
+name: Build ZaTransport APK
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v5
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            git \
+            zip \
+            unzip \
+            openjdk-17-jdk \
+            python3-pip \
+            python3-venv \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake \
+            libffi-dev \
+            libssl-dev \
+            gettext \
+            autopoint
+
+      - name: Create Python environment
+        run: |
+          python3 -m venv .venv
+
+          .venv/bin/python -m pip install \
+            --upgrade \
+            pip \
+            setuptools \
+            wheel
+
+          .venv/bin/python -m pip install \
+            buildozer \
+            "cython<3"
+
+      - name: Cache Buildozer files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-
+
+      - name: Verify project files
+        run: |
+          echo "Files in repository:"
+          find . -maxdepth 3 -type f | sort
+
+          if [ ! -f "main.py" ]; then
+            echo "ERROR: main.py is missing"
+            exit 1
+          fi
+
+          if [ ! -f "buildozer.spec" ]; then
+            echo "ERROR: buildozer.spec is missing"
+            exit 1
+          fi
+
+          if [ ! -f "data/ZaTransport Warehouse.xlsx" ]; then
+            echo "ERROR: workbook is missing"
+            exit 1
+          fi
+
+      - name: Build Android APK
+        env:
+          BUILDOZER_WARN_ON_ROOT: "0"
+        run: |
+          yes | .venv/bin/buildozer -v android debug
+
+      - name: Display APK files
+        if: always()
+        run: |
+          find bin -type f -print 2>/dev/null || true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZaTransport-Android-APK
+          path: bin/*.apk
+          if-no-files-found: error
+          retention-days: 30
