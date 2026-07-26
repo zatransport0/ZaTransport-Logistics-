@@ -1,0 +1,36 @@
+name: Build ZaTransport Android APK
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Build APK with Buildozer
+        id: buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          workdir: .
+          buildozer_version: stable
+          command: buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: ZaTransport-Android-APK
+          path: ${{ steps.buildozer.outputs.filename }}
+          if-no-files-found: error
+          retention-days: 30
